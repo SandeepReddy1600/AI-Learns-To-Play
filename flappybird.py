@@ -5,11 +5,16 @@ import time
 import random
 
 pygame.font.init()
-
+gen=0
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 500
-
 STAT_FONT = pygame.font.SysFont("comicsans", 50)
+
+
+
+
+# To animate the bird flapping we take the images of bird in different positions
+
 
 CHARACTER_IMAGES = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bird1.png"))),
                     pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bird2.png"))),
@@ -26,8 +31,8 @@ class Character:
     animation_time = 5
 
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self.x = x         # x-coordinate
+        self.y = y         # y-coordinate
         self.tilt = 0
         self.vel = 0
         self.tick_count = 0
@@ -36,16 +41,16 @@ class Character:
         self.img = self.IMG[0]
 
     def jump(self):
-        self.vel = -10.5
-        self.tick_count = 0
+        self.vel = -10.5     # Neagtive velocity for moving upwards because in pyGame origin is at Top-left
+        self.tick_count = 0 
         self.height = self.y
 
     def mov(self):
         self.tick_count += 1
 
-        d = self.vel * self.tick_count + 1.5 * self.tick_count ** 2
-        if d > 16:
-            d = 16
+        d = self.vel * self.tick_count + 1.5 * self.tick_count ** 2  # Displacement
+        if d > 16:     # This is a Fail-safe if the bird is moving more that 16 pixels up or down we make saturate to this value
+            d = 16     # Terminal Velocity
         if d < 0:
             d -= 2
         self.y = self.y + d
@@ -66,7 +71,7 @@ class Character:
             self.img = self.IMG[2]
         elif self.img_count < self.animation_time * 4:
             self.img = self.IMG[1]
-        elif self.img_count < self.animation_time * 4 + 1:
+        elif self.img_count == self.animation_time * 4 + 1:
             self.img = self.IMG[0]
             self.img_count = 0
         if self.tilt <= -80:
@@ -105,6 +110,7 @@ class Obstacles:
     def draw(self, win):
         win.blit(self.top_obstacle, (self.x, self.top))
         win.blit(self.bottom_obstacle, (self.x, self.bottom))
+ 
 
     def collide(self, bird):
         bird_mask = bird.get_mask()
@@ -142,12 +148,14 @@ class Base:
         win.blit(self.img, (self.x2, self.y))
 
 
-def draw_window(win, birds, obstacles, base, score):
+def draw_window(win, birds, obstacles, base, score,gen):
     win.blit(BACKGROUND_IMAGES, (0, 0))
     for pipe in obstacles:
         pipe.draw(win)
     text = STAT_FONT.render("Score: " + str(score), 1, (166, 0, 228))
     win.blit(text, (WINDOW_WIDTH - 10 - text.get_width(), 10))
+    text = STAT_FONT.render("GEN: " + str(gen), 1, (166, 0, 228))
+    win.blit(text, (10, 10))
     base.draw(win)
     for bird in birds:
         bird.draw(win)
@@ -155,9 +163,12 @@ def draw_window(win, birds, obstacles, base, score):
 
 
 def main(genomes, config):
+    global gen
+    gen+=1
     birds = []
     ge = []
     nets = []
+    # bird=Character(230,350)
     for __, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
@@ -165,7 +176,7 @@ def main(genomes, config):
         g.fitness = 0
         ge.append(g)
     base = Base(730)
-    pipes = [Obstacles(700)]
+    pipes = [Obstacles(600)]
     win = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     run = True
     score = 0
@@ -196,7 +207,6 @@ def main(genomes, config):
                 bird.jump()
             base.move()
         for pipe in pipes:
-            pipe.move()
             for x, bird in enumerate(birds):
                 if pipe.collide(bird):
                     ge[x].fitness -= 1
@@ -208,23 +218,24 @@ def main(genomes, config):
                     add_pipe = True
             if pipe.x + pipe.top_obstacle.get_width() < 0:
                 rem.append(pipe)
+            pipe.move()
 
         if add_pipe:
             score += 1
             for g in ge:
                 g.fitness += 5
             pipes.append(Obstacles(700))
-            for x, bird in enumerate(birds):
-                if bird.y + bird.img.get_height()-10 >730 or bird.y < -50:
-                    ge[x].fitness -= 1
-                    birds.pop(x)
-                    nets.pop(x)
-                    ge.pop(x)
+        for x, bird in enumerate(birds):
+            if bird.y + bird.img.get_height()-10 >730 or bird.y < -50:
+                ge[x].fitness -= 1
+                birds.pop(x)
+                nets.pop(x)
+                ge.pop(x)
         for r in rem:
             pipes.remove(r)
 
 
-        draw_window(win, birds, pipes, base, score)
+        draw_window(win, birds, pipes, base, score,gen)
 
 
 def run(config_path):
@@ -239,5 +250,5 @@ def run(config_path):
 
 if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join("config-feedforward.txt")
+    config_path = os.path.join(local_dir,"config-feedforward.txt")
     run(config_path)
